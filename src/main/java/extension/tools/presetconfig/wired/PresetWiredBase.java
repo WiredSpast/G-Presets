@@ -68,7 +68,12 @@ public abstract class PresetWiredBase implements PresetJsonConfigurable, Cloneab
                 object.getJSONArray("userSources").toList().stream().map(o -> (int)o).collect(Collectors.toList()) :
                 Collections.emptyList();
         variableIds = object.has("variableIds") ?
-                object.getJSONArray("variableIds").toList().stream().map(o -> (long)o).collect(Collectors.toList()) :
+                object.getJSONArray("variableIds").toList().stream().map(o -> {
+                    if(o instanceof Integer) {
+                        return new Long((int)o);
+                    }
+                    return (long)o;
+                }).collect(Collectors.toList()) :
                 Collections.emptyList();
     }
 
@@ -125,6 +130,8 @@ public abstract class PresetWiredBase implements PresetJsonConfigurable, Cloneab
             new PresetWiredAddon(packet);
         } else if (this instanceof PresetWiredCondition) {
             new PresetWiredCondition(packet);
+        } else if (this instanceof PresetWiredVariable) {
+            new PresetWiredVariable(packet);
         }
 
         extension.sendToServer(packet);
@@ -140,8 +147,18 @@ public abstract class PresetWiredBase implements PresetJsonConfigurable, Cloneab
                     .filter(realFurniIdMap::containsKey)
                     .map(realFurniIdMap::get)
                     .collect(Collectors.toList());
+
+            Long _defaultId = 0L;
+            // Variables from another room
+            if(this instanceof PresetWiredVariable && this.variableIds.size() == 1) {
+                _defaultId = this.variableIds.get(0);
+                realVariableIdMap.put(_defaultId, _defaultId);
+            }
+
+            Long defaultId = _defaultId;
+
             presetWiredBase.variableIds = variableIds.stream()
-                    .map(id -> realVariableIdMap.getOrDefault(id,0L))
+                    .map(id -> id < 0 ? id : realVariableIdMap.getOrDefault(id, defaultId))
                     .collect(Collectors.toList());
 
             presetWiredBase.applyWiredConfig(extension);
